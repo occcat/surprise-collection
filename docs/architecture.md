@@ -16,14 +16,17 @@ The extension watches for step 2. It never clicks, sends or changes anything X n
 
 ## The effect
 
-| Phase | Time (bookmarking) | What happens |
-| --- | --- | --- |
-| Tint | 0–110 ms | The outline turns from grey to blue |
-| Pour | 80–360 ms | Blue liquid pours in from the top. Its edge is a row of round bumps with three rows of droplets ahead of it. The top of the icon swells. |
-| Wobble | 360–900 ms | The icon springs back: the top narrows, the middle pinches, then it settles |
-| Sparks | 340–880 ms | Three sparks fly out of the bottom corners and from under the notch. Each starts as a dot, stretches into a dash, then shrinks and fades. |
+Every curve was measured frame by frame (60 fps) from [@itsluneri's video](https://x.com/itsluneri/status/2116674589719675144), at its normal-speed takes: the bookmark at 0.76 s and the removal at 2.67 s. The icon is 195 px wide there, about 12 px per icon unit, so the measurements are good to a tenth of a unit.
 
-Removing a bookmark (600 ms) swells the top, drains the liquid back up and fades the outline to grey. It has no sparks.
+| Phase | Time (bookmarking, 820 ms) | What happens |
+| --- | --- | --- |
+| Stretch | 0–130 ms | The icon stretches 6 % taller and 3 % narrower. The outline turns from grey to blue by 68 ms. |
+| Pour | 88–268 ms | Liquid falls in from the top with constant acceleration. Its edge is a halftone on 1.81-unit columns: tabs 1.57 long with thin slits between them, large dots (r 0.65) under the slits, small dots (r 0.38) under the tabs. |
+| Squash | 150–300 ms | The icon squashes 13 % shorter, widening by half as much. A bulge up to 14 % wide forms at the top and runs down the icon. |
+| Wobble | 300–620 ms | The icon rebounds 4 % taller, then settles |
+| Sparks | 375–810 ms | As the bulge reaches the bottom, three sparks pop out at the bottom corners (at 45°) and under the notch (straight down). Each outer end shoots out 4.3–4.8 units and slows; the inner end follows later, so the spark stretches into a dash, thins from 1.95 to 1.35 units, and fades from 675 ms. |
+
+Removing a bookmark (540 ms) stretches the icon 6 %, then squashes it 9 % with a bulge running from the bottom up while the liquid drains out, fast at first and slowing to a stop at 395 ms. The outline and the last dots fade to grey from 285 to 415 ms. It has no sparks.
 
 ## Parts
 
@@ -39,17 +42,19 @@ chrome.storage.local        { settings: { enabled, onRemove, locale, version } }
 
 ### `src/effect.ts`: the effect as numbers
 
-`frameAt(kind, ms)` returns one frame: the outline colour's progress, where the liquid's edge is, how the icon is bent and where each spark is. `geometry(frame)` turns that into SVG path data:
+`frameAt(kind, ms)` returns one frame: the colour's progress, where the liquid's edge is, how the icon is bent and where each spark is. `geometry(frame)` turns that into SVG path data:
 
 - The icon's outer edge and the hole in the outline icon are sampled every 0.5 units, so they still look smooth once bent.
-- Bending moves each point sideways by `widthAt(y)`, which widens or narrows the top (`bell`) and pinches the middle (`waist`), and lowers the top towards the bottom edge (`squash`). The bottom edge never moves, so the sparks always leave from the same corners.
-- The liquid is a block above its edge, nine overlapping circles along the edge, and droplets below it. Everything is clipped to the hole grown by 0.25 units. The overlap hides the antialiasing seam two touching shapes of one colour would leave.
+- The jelly is a `Shape`. `squash` lowers the top towards the bottom edge (negative stretches it) and widens the icon by half as much, so it keeps its volume. A bulge of height `bump` sits at `at`, a fraction of the icon's height, and falls off over `above` and `below`. The bottom edge never moves, so the sparks always leave from the same corners.
+- The squash and bulge follow keyframes measured from the video, read with `track()`, a cubic Hermite spline through every key.
+- The liquid is a block above its edge and the halftone below it: tabs, then large dots, then small dots. Everything is clipped to the hole grown by 0.25 units. The overlap hides the antialiasing seam two touching shapes of one colour would leave.
+- The liquid's edge follows a parabola: constant acceleration when pouring, constant deceleration when draining.
 
 Nothing here touches the DOM, so `node --test` covers it directly.
 
 ### `src/render.ts`: drawing a frame
 
-`EffectView` holds one `<svg>` with the icon path (`fill-rule="evenodd"`, so outer edge plus hole is the outline), the liquid path with its `<clipPath>`, and three `<line>`s for the sparks. `draw(kind, ms, colors)` sets their attributes. Every node is made with `createElementNS`. The viewBox is `-3 -3 30 32`, a 24-unit icon with room around it for the swell and the sparks.
+`EffectView` holds one `<svg>` with the icon path (`fill-rule="evenodd"`, so outer edge plus hole is the outline), the liquid path with its `<clipPath>`, and three `<line>`s for the sparks. `draw(kind, ms, colors)` sets their attributes. All three share one colour, so the last of the liquid fades to grey with the outline when a bookmark is removed, as in the video. Every node is made with `createElementNS`. The viewBox is `-3 -3 30 32`, a 24-unit icon with room around it for the swell and the sparks.
 
 ### `src/content.ts`: playing it on x.com
 
@@ -88,7 +93,7 @@ English and Simplified Chinese strings for the settings page. The language defau
 
 | Command | What it covers |
 | --- | --- |
-| `npm test` | `test/unit/`: the icon's shape at rest, start and end frames, the liquid only moving one way, the bottom edge staying put, sparks staying inside the viewBox, no `NaN` in any path, colour parsing and mixing, settings, which effect plays for which switch, the preview text, both languages having the same keys |
+| `npm test` | `test/unit/`: the icon's shape at rest, start and end frames, the jelly matching the video's measured stretch, squash and rebound, the bulge's direction, the halftone's parts, the liquid accelerating in and decelerating out, the bottom edge staying put, sparks staying inside the viewBox, no `NaN` in any path, `track()`, colour parsing and mixing, settings, which effect plays for which switch, the preview text, both languages having the same keys |
 | `npm run test:e2e` | `test/e2e/run.mjs`: loads `dist/` into headless Chrome for Testing and maps `x.com` to a local HTTPS page whose bookmark buttons switch the way X's do, colour delay included. It covers clicking and <kbd>B</kbd>, the overlay sitting exactly on X's icon, the liquid and sparks, X's icon coming back untouched, re-renders and typing playing nothing, a slow server, reduced motion, both switches, storage, restore and undo, the preview, and the language switch. |
 | `npm run screenshots` | The same run, also writing the README images to `docs/screenshots/` |
 

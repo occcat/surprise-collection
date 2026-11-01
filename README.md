@@ -31,7 +31,7 @@
 
 </div>
 
-Surprise Collection is a Chrome extension for x.com. When you bookmark a post, X swaps the outline icon for a filled one in a single frame. Surprise Collection replaces that swap with the effect [@itsluneri showed](https://x.com/itsluneri/status/2116674589719675144): the icon turns blue, liquid pours in from the top with droplets running ahead of it, the icon wobbles back into shape, and three sparks fly out below it. Removing a bookmark drains the liquid back out.
+Surprise Collection is a Chrome extension for x.com. When you bookmark a post, X swaps the outline icon for a filled one in a single frame. Surprise Collection replaces that swap with the effect [@itsluneri showed](https://x.com/itsluneri/status/2116674589719675144): the icon stretches as it turns blue, liquid falls in behind a halftone edge, the icon squashes like jelly as the liquid lands, a bulge runs down it, and three sparks fly out below it. Removing a bookmark squashes it the other way and drains the liquid back out. Every curve was measured frame by frame from that video.
 
 Bookmarking itself works exactly as before. The extension only draws over the icon while the effect plays. It runs only on x.com and twitter.com, asks for no permission besides `storage`, and makes no network requests.
 
@@ -83,19 +83,20 @@ Then click the reload button on the extension's card in `chrome://extensions` an
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/frames-dark.png" />
-  <img src="docs/screenshots/frames-light.png" alt="The effect frame by frame: Tint at 100 ms, Pour at 220 ms, Fill at 340 ms, Wobble at 420 ms, Sparks at 560 ms, Done" width="640" />
+  <img src="docs/screenshots/frames-light.png" alt="The effect frame by frame: Stretch at 70 ms, Pour at 175 ms, Squash at 233 ms, Wobble at 320 ms, Sparks at 480 ms, Done" width="640" />
 </picture>
 
 </div>
 
 | Phase | When | What happens |
 |---|---|---|
-| **Tint** | 0–110 ms | The outline turns from X's grey to its bookmarked blue. |
-| **Pour** | 80–360 ms | Liquid pours in from the top. Its edge is a row of bumps with droplets running ahead of it, and the top of the icon swells. |
-| **Wobble** | 360–900 ms | The icon springs back into shape and settles. |
-| **Sparks** | 340–880 ms | Three sparks fly out of the bottom corners and from under the notch, stretch into dashes, then fade. |
+| **Stretch** | 0–130 ms | The icon stretches 6 % taller and narrower while the outline turns from X's grey to its bookmarked blue. |
+| **Pour** | 88–268 ms | Liquid falls in from the top, faster and faster. Its edge is a halftone: a row of tabs with thin slits between them, a row of large dots, then a row of small dots. |
+| **Squash** | 150–300 ms | As the liquid lands, the icon squashes 13 % shorter and bulges out at the top. The bulge runs down the icon and flares its bottom. |
+| **Wobble** | 300–620 ms | The icon rebounds 4 % taller and settles. |
+| **Sparks** | 375–810 ms | When the bulge reaches the bottom, three sparks fly out of the bottom corners and from under the notch. Each stretches into a dash, thins, and fades. |
 
-Removing a bookmark takes 600 ms: the top swells, the liquid drains back up and the outline fades to grey.
+Removing a bookmark takes 540 ms: the icon stretches, then squashes 9 % with a bulge running up it while the liquid drains back out, and the outline and the last dots fade to grey.
 
 ## Features
 
