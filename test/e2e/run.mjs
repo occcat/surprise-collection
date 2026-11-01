@@ -337,10 +337,11 @@ await x.until(`document.querySelector(${JSON.stringify(BTN(1))}).dataset.testid 
 let st = await effectState(x, 1);
 check("bookmarking plays the effect over X's icon and hides X's own", st.host && st.hidden && st.id === "removeBookmark", JSON.stringify(st));
 check("the effect sits exactly on X's icon", Math.abs(st.dx) < 0.6 && Math.abs(st.dy) < 0.6 && Math.abs(st.scale - 1) < 0.02, JSON.stringify(st));
-await sleep(220);
+// The liquid is in the hole from 88 to 268 ms, the sparks fly from 375 to 810 ms.
+await sleep(90);
 st = await effectState(x, 1);
 check("the liquid pours in", st.liquid, JSON.stringify(st));
-await sleep(260);
+await sleep(300);
 st = await effectState(x, 1);
 check("three sparks fly out after the fill", st.sparks === 3, JSON.stringify(st));
 const fill = await x.eval(`document.querySelector(${JSON.stringify(HOST(1))}).shadowRoot.querySelector("path[fill-rule]").getAttribute("fill")`);

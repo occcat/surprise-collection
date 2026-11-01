@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DURATION, EMPTY_FRONT, FULL_FRONT, frameAt, geometry, HOLE, mixColor, OUTER, parseRgb, REST, VIEWBOX, warp, widthAt, type EffectKind } from "../../src/effect.ts";
+import { DURATION, EMPTY_FRONT, FULL_FRONT, frameAt, geometry, HOLE, mixColor, OUTER, parseRgb, REST, track, VIEWBOX, warp, widthAt, type EffectKind } from "../../src/effect.ts";
 
 const KINDS: EffectKind[] = ["add", "remove"];
 const every = (kind: EffectKind, step = 10): number[] => Array.from({ length: Math.floor(DURATION[kind] / step) }, (_, i) => i * step);
@@ -36,11 +36,11 @@ test("both effects end at rest: add on the filled icon, remove on the outline", 
 
 test("each effect starts where X's icon was: add on the outline, remove on the filled icon", () => {
   const add = frameAt("add", 0);
-  assert.equal(add.front, EMPTY_FRONT);
+  assert.ok(add.front <= EMPTY_FRONT);
   assert.equal(add.tint, 0);
-  assert.ok(geometry(add).hole);
+  assert.ok(geometry(add).hole && !geometry(add).liquid);
   const remove = frameAt("remove", 0);
-  assert.equal(remove.front, FULL_FRONT);
+  assert.ok(remove.front >= FULL_FRONT);
   assert.equal(geometry(remove).hole, null);
 });
 
@@ -68,6 +68,43 @@ test("the icon keeps its bottom edge and stays inside the effect's box", () => {
       assert.ok(widthAt(12, s) > 0.7 && widthAt(12, s) < 1.3);
     }
   }
+});
+
+test("the jelly follows the reference video: stretch, squash, rebound", () => {
+  // Measured at 60 fps from @itsluneri's video: 6 % taller while the outline turns blue, 13 %
+  // shorter when the liquid lands, a small stretch on the rebound.
+  const sq = (t: number) => frameAt("add", t).shape.squash;
+  assert.ok(Math.abs(sq(100) + 0.06) < 0.002);
+  assert.ok(Math.abs(sq(233) - 0.129) < 0.002);
+  assert.ok(Math.abs(sq(367) + 0.043) < 0.002);
+  assert.ok(Math.abs(frameAt("remove", 183).shape.squash - 0.094) < 0.002);
+  // The bulge runs down the icon when bookmarking and up it when removing.
+  assert.ok(frameAt("add", 200).shape.at < frameAt("add", 300).shape.at);
+  assert.ok(frameAt("remove", 160).shape.at > frameAt("remove", 300).shape.at);
+  // Squashed, the icon widens to keep its volume.
+  assert.ok(widthAt(12, frameAt("add", 233).shape) > 1.05);
+});
+
+test("track() passes through every key and holds its ends", () => {
+  const keys = [[0, 0], [10, 1], [30, -1], [40, 0]];
+  for (const [t, v] of keys) assert.ok(Math.abs(track(keys, t ?? 0) - (v ?? 0)) < 1e-9);
+  assert.equal(track(keys, -5), 0);
+  assert.equal(track(keys, 99), 0);
+  assert.equal(track([[0, 1, 5], [10, 1, 7]], 5, 2), 6);
+});
+
+test("the liquid's edge is a halftone: tabs, then large dots, then small dots", () => {
+  const g = geometry(frameAt("add", 200));
+  // One block, eight tabs, seven large dots, six small dots.
+  assert.equal(g.liquid?.match(/M/g)?.length, 22);
+});
+
+test("the liquid falls in faster and faster, and drains out slower and slower", () => {
+  const f = (k: EffectKind, t: number) => frameAt(k, t).front;
+  assert.ok(f("add", 200) - f("add", 150) > f("add", 150) - f("add", 100));
+  assert.ok(f("remove", 250) - f("remove", 300) > f("remove", 300) - f("remove", 350));
+  assert.ok(f("add", 280) >= FULL_FRONT);
+  assert.ok(f("remove", 400) <= EMPTY_FRONT);
 });
 
 test("add throws three sparks out below the icon after the fill; remove throws none", () => {
@@ -105,7 +142,7 @@ test("geometry gives clipped liquid only while the hole is part full", () => {
 });
 
 test("negative and missing times are safe", () => {
-  assert.equal(frameAt("add", -50).front, EMPTY_FRONT);
+  assert.ok(frameAt("add", -50).front <= EMPTY_FRONT);
   assert.equal(frameAt("add", Number.NaN).done, true);
 });
 

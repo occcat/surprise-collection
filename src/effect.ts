@@ -1,7 +1,11 @@
 /**
  * The bookmark effect as plain numbers and path strings: where the liquid's edge is, how the icon
- * bends and where the sparks are at each moment. No DOM here, so node --test covers it; render.ts
+ * wobbles and where the sparks are at each moment. No DOM here, so node --test covers it; render.ts
  * puts the paths on screen.
+ *
+ * Every curve below was measured frame by frame (60 fps) from @itsluneri's video,
+ * https://x.com/itsluneri/status/2116674589719675144, at its normal-speed takes: the bookmark at
+ * 0.76 s and the removal at 2.67 s. Times are ms from the first frame the icon moves.
  *
  * Coordinates are in the 24 × 24 viewBox of X's bookmark icon, y pointing down.
  */
@@ -10,9 +14,9 @@ export type EffectKind = "add" | "remove";
 export type Point = readonly [number, number];
 
 /** How long each effect runs, in ms. */
-export const DURATION: Readonly<Record<EffectKind, number>> = { add: 900, remove: 600 };
+export const DURATION: Readonly<Record<EffectKind, number>> = { add: 820, remove: 540 };
 
-/** The box the effect is drawn in. It is larger than the icon: the top bulges and the sparks fly out below. */
+/** The box the effect is drawn in. It is larger than the icon: the icon stretches and bulges, and the sparks fly out below. */
 export const VIEWBOX = { x: -3, y: -3, w: 30, h: 32 } as const;
 
 // X's icon: the outer edge spans x 4–20 and y 2–22.94, with the notch rising to y 17.23 at x 12.
@@ -20,21 +24,26 @@ export const VIEWBOX = { x: -3, y: -3, w: 30, h: 32 } as const;
 export const CX = 12;
 const TOP = 2;
 const BOTTOM = 22.94;
+const NOTCH = 17.23;
 const HOLE_TOP = 4;
 const HOLE_BOTTOM = 19.06;
 
-/** Bumps along the liquid's edge. They overlap, which leaves small points between them. */
-const EDGE = { r: 0.95, gap: 1.75 } as const;
-/** Rows of droplets running ahead of the edge: distance below it, radius, sideways shift in gaps. */
-const DROPS: ReadonlyArray<{ dy: number; r: number; shift: number }> = [
-  { dy: 1.75, r: 0.55, shift: 0.5 },
-  { dy: 3, r: 0.36, shift: 0 },
-  { dy: 4.05, r: 0.2, shift: 0.5 },
-];
-/** At this edge position no droplet has reached the hole yet. */
-export const EMPTY_FRONT = HOLE_TOP - 4.6;
-/** At this edge position the hole is full. */
-export const FULL_FRONT = HOLE_BOTTOM + 1.2;
+/**
+ * The liquid's edge is a halftone, laid out on columns `pitch` apart and measured from the edge of
+ * the solid liquid: a row of tabs hanging from it with thin slits between them, then a row of large
+ * dots in the slits' columns, then a row of small dots in the tabs' columns.
+ */
+const HALFTONE = {
+  pitch: 1.81,
+  tab: { halfWidth: 0.795, length: 1.57, round: 0.6 },
+  big: { dy: 2.38, r: 0.65 },
+  small: { dy: 4.14, r: 0.38 },
+} as const;
+const DEPTH = HALFTONE.small.dy + HALFTONE.small.r;
+/** At this edge position no part of the liquid has reached the hole yet. */
+export const EMPTY_FRONT = HOLE_TOP - DEPTH;
+/** At this edge position the hole is full: past its bottom corners, and past the clip's margin. */
+export const FULL_FRONT = HOLE_BOTTOM + 0.3;
 
 // --- Outlines ---------------------------------------------------------------------------------
 
@@ -43,11 +52,12 @@ function line(out: Point[], a: Point, b: Point, step: number): void {
   for (let i = 0; i < n; i++) out.push([a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n]);
 }
 
-function arc(out: Point[], cx: number, cy: number, r: number, a0: number, a1: number, step: number): void {
-  const n = Math.max(4, Math.ceil((Math.abs(a1 - a0) * r) / step));
+/** Points on an ellipse from angle a0 to a1 (radians, growing clockwise on screen), end excluded. */
+function arc(out: Point[], cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, step: number): void {
+  const n = Math.max(4, Math.ceil((Math.abs(a1 - a0) * Math.max(rx, ry)) / step));
   for (let i = 0; i < n; i++) {
     const a = a0 + ((a1 - a0) * i) / n;
-    out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
   }
 }
 
@@ -58,9 +68,9 @@ function arc(out: Point[], cx: number, cy: number, r: number, a0: number, a1: nu
 function bookmark(x0: number, x1: number, top: number, r: number, bottom: number, notch: number): Point[] {
   const step = 0.5;
   const out: Point[] = [];
-  arc(out, x0 + r, top + r, r, Math.PI, 1.5 * Math.PI, step);
+  arc(out, x0 + r, top + r, r, r, Math.PI, 1.5 * Math.PI, step);
   line(out, [x0 + r, top], [x1 - r, top], step);
-  arc(out, x1 - r, top + r, r, 1.5 * Math.PI, 2 * Math.PI, step);
+  arc(out, x1 - r, top + r, r, r, 1.5 * Math.PI, 2 * Math.PI, step);
   line(out, [x1, top + r], [x1, bottom], step);
   line(out, [x1, bottom], [CX, notch], step);
   line(out, [CX, notch], [x0, bottom], step);
@@ -87,7 +97,7 @@ function unit(x: number, y: number): Point {
 }
 
 /** The outer edge of X's icon. */
-export const OUTER: readonly Point[] = bookmark(4, 20, TOP, 2.5, BOTTOM, 17.23);
+export const OUTER: readonly Point[] = bookmark(4, 20, TOP, 2.5, BOTTOM, NOTCH);
 /** The hole of the not-yet-bookmarked icon. */
 export const HOLE: readonly Point[] = bookmark(6, 18, HOLE_TOP, 0.5, HOLE_BOTTOM, 14.77);
 /**
@@ -96,20 +106,24 @@ export const HOLE: readonly Point[] = bookmark(6, 18, HOLE_TOP, 0.5, HOLE_BOTTOM
  */
 const CLIP: readonly Point[] = grow(HOLE, 0.25);
 
-// --- Bending ----------------------------------------------------------------------------------
+// --- Jelly ------------------------------------------------------------------------------------
 
 /**
- * How the icon is bent away from its rest shape. `bell` widens the top (narrows it when negative),
- * `waist` pinches the middle (bulges it when negative), `squash` lowers the top towards the bottom
- * edge, which stays where it is. The bottom edge never moves, so the sparks leave from fixed corners.
+ * How the icon is bent away from its rest shape, like jelly. `squash` lowers the top towards the
+ * bottom edge, which never moves (negative: the icon stretches taller), and widens the icon by half
+ * as much, so it keeps its volume. On top of that a bulge of height `bump` sits at `at`, a fraction
+ * of the icon's height from the top (0) to the bottom (1), and falls off over `above` towards the
+ * top and `below` towards the bottom.
  */
-export type Shape = { bell: number; waist: number; squash: number };
-export const REST: Shape = { bell: 0, waist: 0, squash: 0 };
+export type Shape = { squash: number; bump: number; at: number; above: number; below: number };
+export const REST: Shape = { squash: 0, bump: 0, at: 0, above: 0.17, below: 0.17 };
 
-/** The icon's width at height y, as a multiple of its width at rest. */
+/** The icon's width at rest height y, as a multiple of its width at rest. */
 export function widthAt(y: number, s: Shape): number {
-  const u = Math.min(1, Math.max(0, (y - TOP) / (BOTTOM - TOP)));
-  return 1 + s.bell * (1 - u) ** 2 - s.waist * Math.sin(Math.PI * u);
+  const u = (y - TOP) / (BOTTOM - TOP);
+  const d = u - s.at;
+  const sigma = d < 0 ? s.above : s.below;
+  return 1 + 0.5 * s.squash + s.bump * Math.exp(-(d * d) / (2 * sigma * sigma));
 }
 
 export function warp(p: Point, s: Shape): Point {
@@ -118,13 +132,81 @@ export function warp(p: Point, s: Shape): Point {
 
 // --- Time -------------------------------------------------------------------------------------
 
-/** A short stroke with round caps, drawn in the liquid's colour. */
+/** Rows of [ms, value, value…]. Read with track(). */
+type Keys = ReadonlyArray<readonly number[]>;
+
+/**
+ * Column `col` of `keys` at time t, on a smooth curve through every key (a cubic Hermite spline,
+ * flat at both ends). Before the first key it holds the first value, after the last the last.
+ */
+export function track(keys: Keys, t: number, col = 1): number {
+  const first = keys[0];
+  const last = keys[keys.length - 1];
+  if (!first || !last) return 0;
+  if (!(t > (first[0] ?? 0))) return first[col] ?? 0;
+  if (t >= (last[0] ?? 0)) return last[col] ?? 0;
+  let i = 0;
+  while ((keys[i + 1]?.[0] ?? Infinity) <= t) i++;
+  const at = (k: number, c: number): number => keys[Math.min(keys.length - 1, Math.max(0, k))]?.[c] ?? 0;
+  const slope = (k: number): number => (k <= 0 || k >= keys.length - 1 ? 0 : (at(k + 1, col) - at(k - 1, col)) / (at(k + 1, 0) - at(k - 1, 0)));
+  const t0 = at(i, 0);
+  const h = at(i + 1, 0) - t0;
+  const p = (t - t0) / h;
+  const p2 = p * p;
+  const p3 = p2 * p;
+  return (2 * p3 - 3 * p2 + 1) * at(i, col) + (p3 - 2 * p2 + p) * h * slope(i) + (-2 * p3 + 3 * p2) * at(i + 1, col) + (p3 - p2) * h * slope(i + 1);
+}
+
+/**
+ * The squash over time. Bookmarking: the icon stretches 6 % taller as it fills with colour, squashes
+ * 13 % when the liquid lands, then rebounds and settles. Removing does the same, a little softer.
+ */
+const SQUASH: Readonly<Record<EffectKind, Keys>> = {
+  add: [
+    [0, 0], [17, -0.004], [33, -0.024], [50, -0.039], [67, -0.051], [83, -0.059], [100, -0.06], [117, -0.056],
+    [133, -0.04], [150, -0.012], [167, 0.03], [183, 0.074], [200, 0.105], [217, 0.123], [233, 0.129], [250, 0.106],
+    [267, 0.074], [283, 0.042], [300, 0.012], [317, -0.016], [333, -0.031], [350, -0.04], [367, -0.043], [383, -0.039],
+    [400, -0.031], [417, -0.021], [433, -0.012], [450, -0.004], [467, 0.004], [483, 0.01], [500, 0.012], [533, 0.012],
+    [550, 0.008], [583, 0.004], [620, 0],
+  ],
+  remove: [
+    [0, 0], [17, -0.008], [33, -0.035], [50, -0.051], [67, -0.059], [83, -0.059], [100, -0.043], [117, -0.012],
+    [133, 0.031], [150, 0.067], [167, 0.086], [183, 0.094], [200, 0.078], [217, 0.054], [233, 0.031], [250, 0.008],
+    [267, -0.012], [283, -0.024], [300, -0.031], [317, -0.031], [333, -0.028], [350, -0.024], [367, -0.016],
+    [383, -0.008], [400, -0.001], [417, 0.004], [433, 0.008], [483, 0.008], [517, 0.004], [540, 0],
+  ],
+};
+
+/**
+ * The bulge: [ms, height, position, fall-off towards the top]. Bookmarking, it swells at the top as
+ * the icon squashes and runs down to the bottom, where the sparks fly out. Removing, it starts at the
+ * bottom and runs up as the liquid drains.
+ */
+const BUMP: Readonly<Record<EffectKind, Keys>> = {
+  add: [
+    [150, 0, 0.05, 0.26], [167, 0.075, 0.05, 0.26], [183, 0.09, 0.06, 0.26], [200, 0.125, 0.09, 0.26],
+    [217, 0.128, 0.17, 0.26], [233, 0.14, 0.28, 0.25], [250, 0.14, 0.35, 0.2], [267, 0.138, 0.45, 0.17],
+    [283, 0.133, 0.54, 0.17], [300, 0.128, 0.63, 0.17], [317, 0.118, 0.72, 0.17], [333, 0.11, 0.81, 0.17],
+    [350, 0.1, 0.9, 0.17], [367, 0.085, 0.97, 0.17], [383, 0.06, 1.02, 0.17], [400, 0.03, 1.06, 0.17],
+    [433, 0, 1.12, 0.17],
+  ],
+  remove: [
+    [117, 0, 0.97, 0.16], [133, 0.05, 0.95, 0.16], [150, 0.07, 0.9, 0.16], [167, 0.08, 0.85, 0.16],
+    [183, 0.096, 0.8, 0.16], [200, 0.096, 0.71, 0.16], [217, 0.096, 0.64, 0.16], [233, 0.098, 0.55, 0.16],
+    [250, 0.1, 0.43, 0.16], [267, 0.1, 0.33, 0.16], [283, 0.085, 0.24, 0.16], [300, 0.08, 0.14, 0.16],
+    [317, 0.08, 0.06, 0.16], [333, 0.06, 0.05, 0.16], [350, 0.05, 0.05, 0.16], [367, 0.04, 0.05, 0.16],
+    [383, 0.025, 0.05, 0.16], [400, 0, 0.05, 0.16],
+  ],
+};
+const BUMP_BELOW: Readonly<Record<EffectKind, number>> = { add: 0.17, remove: 0.16 };
+
+/** A short stroke with round caps. (x1, y1) is the end nearer the icon. */
 export type Spark = { x1: number; y1: number; x2: number; y2: number; width: number; alpha: number };
 
 export type Frame = {
-  /** 0 draws the outline in the icon's colour from before the click, 1 in its colour after. */
+  /** 0 draws everything in the icon's colour from before the click, 1 in its colour after. */
   tint: number;
-  /** The liquid fills the icon down to this y. */
+  /** The edge of the solid liquid, in rest coordinates: everything above it is filled. */
   front: number;
   shape: Shape;
   sparks: Spark[];
@@ -134,69 +216,71 @@ export type Frame = {
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 const progress = (t: number, from: number, to: number): number => clamp01((t - from) / (to - from));
-const easeInOut = (p: number): number => (p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) * (1 - p));
-const easeOut = (p: number): number => 1 - (1 - p) ** 3;
 const smooth = (p: number): number => p * p * (3 - 2 * p);
+const easeOut = (p: number, k: number): number => 1 - (1 - p) ** k;
 
-/** Where the sparks start and which way they fly: out of both bottom corners, and down from under the notch. */
-const SPARKS: ReadonlyArray<{ at: Point; dir: Point }> = [
-  { at: [3.2, 23.6], dir: [-Math.SQRT1_2, Math.SQRT1_2] },
-  { at: [CX, 20.6], dir: [0, 1] },
-  { at: [20.8, 23.6], dir: [Math.SQRT1_2, Math.SQRT1_2] },
-];
-
-/** Each spark starts as a dot, stretches into a dash as it flies out, and shrinks back to a fading dot. */
-function sparksAt(q: number): Spark[] {
-  if (q <= 0 || q >= 1) return [];
-  const travel = 0.6 + 2.6 * easeOut(q);
-  // Never quite zero: a zero-length stroke may lose its round caps, and the dot would vanish.
-  const len = Math.max(0.02, 2.3 * Math.sin(Math.PI * Math.min(1, q / 0.85)));
-  const width = 1.45 - 0.35 * q;
-  const alpha = q < 0.65 ? 1 : 1 - (q - 0.65) / 0.35;
-  return SPARKS.map(({ at, dir }) => ({
-    x1: at[0] + dir[0] * travel,
-    y1: at[1] + dir[1] * travel,
-    x2: at[0] + dir[0] * (travel + len),
-    y2: at[1] + dir[1] * (travel + len),
-    width,
-    alpha,
-  }));
+/**
+ * The edge of the solid liquid. Bookmarking, it pops in at 88 ms with only the small dots showing
+ * below the hole's top, then falls with constant acceleration, like a drop, and passes the bottom
+ * of the hole at 268 ms. Removing, it rises fast from 197 ms and slows to a stop with the small
+ * dots touching the hole's top, where they vanish at 395 ms.
+ */
+function frontAt(kind: EffectKind, t: number): number {
+  const hidden = EMPTY_FRONT - 0.06;
+  if (kind === "add") return t < 88 ? hidden : Math.min(FULL_FRONT + 1, 0.381 + 5.41e-4 * (t - 81) ** 2);
+  return t >= 395 ? hidden : Math.min(FULL_FRONT + 1, 0.554 + 5.0e-4 * Math.max(0, 391.2 - t) ** 2);
 }
 
 /**
- * The effect `time` ms after X switched the button. Timings follow @itsluneri's video, frame by frame.
+ * Where the sparks start and which way they fly: out of the bottom corners at 45°, and straight
+ * down from the notch. `start` is how far along that line they appear, `travel` how far the outer
+ * end goes.
+ */
+const S = Math.SQRT1_2;
+const SPARKS: ReadonlyArray<{ from: Point; dir: Point; start: number; inner: number; travel: number }> = [
+  { from: [3.8, 22.74], dir: [-S, S], start: 0.6, inner: 0.6, travel: 4.75 },
+  { from: [CX, NOTCH], dir: [0, 1], start: 4.4, inner: 4.0, travel: 4.32 },
+  { from: [20.2, 22.74], dir: [S, S], start: 0.6, inner: 0.6, travel: 4.75 },
+];
+
+/**
+ * Bookmarking only. Each spark pops out as a dot when the bulge reaches the bottom, its outer end
+ * shoots out and slows down, its inner end follows later, so it stretches into a dash and shrinks
+ * back to a short one. It thins from 1.95 to 1.35 units on the way, then fades.
+ */
+function sparksAt(t: number): Spark[] {
+  if (t < 375 || t >= 810) return [];
+  const out = easeOut(progress(t, 370, 770), 2.8);
+  const inn = easeOut(progress(t, 460, 890), 2.5);
+  const width = 1.3 + 0.65 * smooth(progress(t, 375, 425)) - 0.6 * progress(t, 440, 760);
+  const alpha = 1 - progress(t, 675, 810);
+  return SPARKS.map(({ from, dir, start, inner, travel }) => {
+    const b = start + travel * out;
+    const a = Math.min(b, inner + (start + travel - inner) * inn);
+    return { x1: from[0] + dir[0] * a, y1: from[1] + dir[1] * a, x2: from[0] + dir[0] * b, y2: from[1] + dir[1] * b, width, alpha };
+  });
+}
+
+/**
+ * The effect `time` ms after X switched the button.
  *
- * add: the outline takes the bookmarked colour, liquid pours in from the top with droplets ahead
- * of its edge while the top swells, then the icon wobbles back into shape and three sparks fly out.
- * remove: the top swells, the liquid drains back up, the icon settles and the outline fades to the
- * idle colour.
+ * add: the outline turns blue as the icon stretches; liquid falls in from the top, led by its
+ * halftone edge; the icon squashes as it lands and a bulge runs down it; three sparks fly out when
+ * the bulge reaches the bottom.
+ * remove: the icon stretches, then squashes with a bulge running up while the liquid drains back
+ * out; the outline and the last of the liquid fade to the idle colour.
  */
 export function frameAt(kind: EffectKind, time: number): Frame {
   if (!(time < DURATION[kind])) {
-    return { tint: 1, front: kind === "add" ? FULL_FRONT : EMPTY_FRONT, shape: { ...REST }, sparks: [], done: true };
+    return { tint: 1, front: kind === "add" ? FULL_FRONT + 1 : EMPTY_FRONT - 0.06, shape: { ...REST }, sparks: [], done: true };
   }
   const t = Math.max(0, time);
-  if (kind === "add") {
-    const fill = progress(t, 80, 360);
-    const after = Math.max(0, t - 360);
-    const settle = 1 - smooth(progress(t, 720, 900));
-    const bell = settle * (t < 360 ? 0.18 * Math.sin((Math.PI / 2) * fill) : 0.18 * Math.cos((2 * Math.PI * after) / 260) * Math.exp(-after / 140));
-    const waist = settle * (t < 360 ? 0.06 * fill : 0.06 * Math.exp(-after / 60) - 0.1 * Math.sin((Math.PI * after) / 200) * Math.exp(-after / 160));
-    return {
-      tint: smooth(progress(t, 0, 110)),
-      front: EMPTY_FRONT + (FULL_FRONT - EMPTY_FRONT) * easeInOut(fill),
-      shape: { bell, waist, squash: 0.45 * bell },
-      sparks: sparksAt(progress(t, 340, 880)),
-      done: false,
-    };
-  }
-  const swell = t < 160 ? Math.sin((Math.PI / 2) * progress(t, 0, 160)) : Math.cos((Math.PI / 2) * progress(t, 160, 460));
-  const bell = 0.15 * swell;
+  const bump = BUMP[kind];
   return {
-    tint: smooth(progress(t, 380, 560)),
-    front: FULL_FRONT + (EMPTY_FRONT - FULL_FRONT) * easeInOut(progress(t, 110, 420)),
-    shape: { bell, waist: 0.05 * swell, squash: 0.45 * bell },
-    sparks: [],
+    tint: kind === "add" ? smooth(progress(t, 5, 68)) : smooth(progress(t, 285, 415)),
+    front: frontAt(kind, t),
+    shape: { squash: track(SQUASH[kind], t), bump: track(bump, t, 1), at: track(bump, t, 2), above: track(bump, t, 3), below: BUMP_BELOW[kind] },
+    sparks: kind === "add" ? sparksAt(t) : [],
     done: false,
   };
 }
@@ -220,29 +304,37 @@ function pathOf(polys: ReadonlyArray<readonly Point[]>): string {
   return polys.map((poly) => poly.map((p, i) => `${i ? "L" : "M"}${round(p[0])} ${round(p[1])}`).join("") + "Z").join("");
 }
 
+/** A dot. Angles grow clockwise on screen, as in every other shape here, so they all add up under the nonzero fill rule. */
 function circle(cx: number, cy: number, r: number): Point[] {
-  const n = Math.max(8, Math.ceil((2 * Math.PI * r) / 0.3));
-  // Angles grow clockwise on screen with y down, matching the other shapes, so they all add up
-  // under the nonzero fill rule.
-  return Array.from({ length: n }, (_, i): Point => [cx + r * Math.cos((2 * Math.PI * i) / n), cy + r * Math.sin((2 * Math.PI * i) / n)]);
+  const out: Point[] = [];
+  arc(out, cx, cy, r, r, 0, 2 * Math.PI, 0.25);
+  return out;
 }
 
-/** The liquid down to `front`, unbent: a block above it, bumps along it, droplets below it. */
+/** A tab hanging from the liquid's edge at y: straight sides and a rounded bottom. Starts a little above y so it joins the block. */
+function tab(x: number, y: number): Point[] {
+  const { halfWidth: w, length, round: r } = HALFTONE.tab;
+  const out: Point[] = [];
+  line(out, [x - w, y - 0.2], [x + w, y - 0.2], 0.5);
+  line(out, [x + w, y - 0.2], [x + w, y + length - r], 0.5);
+  arc(out, x, y + length - r, w, r, 0, Math.PI, 0.25);
+  line(out, [x - w, y + length - r], [x - w, y - 0.2], 0.5);
+  return out;
+}
+
+/** The liquid down to `front`, unbent: a block above it, then the halftone below it. */
 function liquidAt(front: number): Point[][] {
   const block: Point[] = [];
-  const [x0, x1, top] = [CX - 9, CX + 9, -3];
+  const [x0, x1, top] = [CX - 10, CX + 10, -3];
   line(block, [x0, top], [x1, top], 1);
   line(block, [x1, top], [x1, front], 0.5);
-  line(block, [x1, front], [x0, front], 1);
+  line(block, [x1, front], [x0, front], 0.5);
   line(block, [x0, front], [x0, top], 0.5);
   const out = [block];
-  for (let k = -4; k <= 4; k++) out.push(circle(CX + k * EDGE.gap, front, EDGE.r));
-  for (const row of DROPS) {
-    for (let k = -4; k <= 4; k++) {
-      const x = CX + (k + row.shift) * EDGE.gap;
-      if (Math.abs(x - CX) <= 6.4) out.push(circle(x, front + row.dy, row.r));
-    }
-  }
+  const { pitch, big, small } = HALFTONE;
+  for (let k = -4; k <= 3; k++) out.push(tab(CX + (k + 0.5) * pitch, front));
+  for (let k = -3; k <= 3; k++) out.push(circle(CX + k * pitch, front + big.dy, big.r));
+  for (let k = -3; k <= 2; k++) out.push(circle(CX + (k + 0.5) * pitch, front + small.dy, small.r));
   return out;
 }
 

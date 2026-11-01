@@ -5,11 +5,11 @@ import type { Settings } from "../settings.ts";
 
 /** The frames the "frame by frame" strip shows, with the ms each is taken at. */
 export const STEPS: ReadonlyArray<{ key: string; kind: EffectKind; t: number }> = [
-  { key: "stepTint", kind: "add", t: 100 },
-  { key: "stepPour", kind: "add", t: 220 },
-  { key: "stepFill", kind: "add", t: 340 },
-  { key: "stepWobble", kind: "add", t: 420 },
-  { key: "stepSparks", kind: "add", t: 560 },
+  { key: "stepStretch", kind: "add", t: 70 },
+  { key: "stepPour", kind: "add", t: 175 },
+  { key: "stepSquash", kind: "add", t: 233 },
+  { key: "stepWobble", kind: "add", t: 320 },
+  { key: "stepSparks", kind: "add", t: 480 },
   { key: "stepRest", kind: "add", t: Infinity },
 ];
 

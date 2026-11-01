@@ -70,7 +70,7 @@ function play(kind: EffectKind): void {
   cancelAnimationFrame(anim);
   bookmarked = kind === "add";
   paintToggle();
-  const colors = kind === "add" ? { from: idle(), to: blue(), liquid: blue() } : { from: blue(), to: idle(), liquid: blue() };
+  const colors = kind === "add" ? { from: idle(), to: blue() } : { from: blue(), to: idle() };
   const start = performance.now();
   const step = (): void => {
     if (view.draw(kind, performance.now() - start, colors)) return;
@@ -89,7 +89,7 @@ function paintSteps(): void {
     const li = document.createElement("li");
     const v = new EffectView(document);
     const f = frameAt(s.kind, s.t);
-    v.draw(s.kind, s.t, { from: idle(), to: blue(), liquid: blue() });
+    v.draw(s.kind, s.t, { from: idle(), to: blue() });
     const name = document.createElement("span");
     name.textContent = t(state.locale, s.key);
     const ms = document.createElement("span");

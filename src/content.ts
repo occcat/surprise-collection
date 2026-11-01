@@ -127,7 +127,7 @@ class Playing {
     // colour even if you were quicker than X's colouring, and ends on X's idle colour, which X
     // sets as soon as it switches the button.
     const bookmarked = accentColor();
-    this.colors = kind === "add" ? { from: from || idleColor(button) || bookmarked, to: bookmarked, liquid: bookmarked } : { from: bookmarked, to: bookmarked, liquid: bookmarked };
+    this.colors = kind === "add" ? { from: from || idleColor(button) || bookmarked, to: bookmarked } : { from: bookmarked, to: bookmarked };
     this.host = document.createElement(HOST_TAG);
     // place() corrects by the measured offset. Starting from 0 rather than "auto" makes that
     // offset relative to the containing block, not to wherever the static position happens to be.
@@ -155,7 +155,7 @@ class Playing {
     else if (settled && parseRgb(live) && !sameColor(live, this.colors.from) && !sameColor(live, this.colors.to)) {
       // X has coloured its icon: that is the bookmarked colour to end on.
       accent = live;
-      this.colors = { ...this.colors, to: live, liquid: live };
+      this.colors = { ...this.colors, to: live };
     }
     this.hide(icon);
     if (this.host.parentElement !== icon.parentElement) icon.parentElement.append(this.host);

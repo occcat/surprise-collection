@@ -6,8 +6,11 @@ import { frameAt, geometry, mixColor, VIEWBOX, type EffectKind } from "./effect.
 
 const SVG = "http://www.w3.org/2000/svg";
 
-/** Outline colour before and after the click, and the liquid's colour. */
-export type Colors = { from: string; to: string; liquid: string };
+/**
+ * The icon's colour before and after the click. The outline, the liquid and the sparks all share it:
+ * when a bookmark is removed, the last of the liquid fades to grey with the outline.
+ */
+export type Colors = { from: string; to: string };
 
 let seq = 0;
 
@@ -47,11 +50,12 @@ export class EffectView {
   draw(kind: EffectKind, t: number, c: Colors): boolean {
     const f = frameAt(kind, t);
     const g = geometry(f);
+    const color = mixColor(c.from, c.to, f.tint);
     this.body.setAttribute("d", g.hole ? g.body + g.hole : g.body);
-    this.body.setAttribute("fill", mixColor(c.from, c.to, f.tint));
+    this.body.setAttribute("fill", color);
     if (g.liquid && g.clip) {
       this.liquid.setAttribute("d", g.liquid);
-      this.liquid.setAttribute("fill", c.liquid);
+      this.liquid.setAttribute("fill", color);
       this.clip.setAttribute("d", g.clip);
       this.liquid.removeAttribute("display");
     } else {
@@ -66,7 +70,7 @@ export class EffectView {
       line.setAttribute("x2", String(s.x2));
       line.setAttribute("y2", String(s.y2));
       line.setAttribute("stroke-width", String(s.width));
-      line.setAttribute("stroke", c.liquid);
+      line.setAttribute("stroke", color);
       line.setAttribute("opacity", String(s.alpha));
     });
     return f.done;
@@ -74,6 +78,6 @@ export class EffectView {
 
   /** The icon at rest, as X draws it. */
   rest(bookmarked: boolean, color: string): void {
-    this.draw(bookmarked ? "add" : "remove", Infinity, { from: color, to: color, liquid: color });
+    this.draw(bookmarked ? "add" : "remove", Infinity, { from: color, to: color });
   }
 }
