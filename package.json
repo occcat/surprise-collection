@@ -1,0 +1,26 @@
+{
+  "name": "surprise-collection",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension that replaces X's bookmark icon swap with a liquid-fill effect and a burst of sparks.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/unit/*.test.ts\"",
+    "test:e2e": "node test/e2e/run.mjs",
+    "icons": "python3 scripts/icons.py",
+    "screenshots": "node test/e2e/run.mjs --readme docs/screenshots"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.0",
+    "@types/node": "^24.5.2",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  }
+}

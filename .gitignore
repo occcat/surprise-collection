@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output: load dist/ in Chrome, never commit it
+dist/
+
+# Packed extensions and signing keys
+*.crx
+*.pem
+*.zip
+
+# Local screenshots from npm run test:e2e -- --shots <dir>
+shots/
+
+# Logs and caches
+*.log
+npm-debug.log*
+.npm/
+.eslintcache
+*.tsbuildinfo
+coverage/
+
+# Environment files
+.env
+.env.*
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local agent and worktree state
+.claude/
+.worktree/
+worktrees/
